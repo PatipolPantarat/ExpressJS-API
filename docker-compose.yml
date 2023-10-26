@@ -20,6 +20,8 @@ services:
       - db
     networks:
       - mynetwork
+    environment:
+      DB_SOURCE: postgres://postgres:root@db:5432/testDockerEC2
 
 networks:
   mynetwork:
