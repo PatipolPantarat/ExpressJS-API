@@ -12,6 +12,14 @@ services:
       - ./docker-volume/postgres/pg_data:/var/lib/postgresql/data
     networks:
       - mynetwork
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    networks:
+      - mynetwork
 
 networks:
   mynetwork:
