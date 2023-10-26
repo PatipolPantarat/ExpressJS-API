@@ -1,0 +1,19 @@
+version: "3"
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: testDockerEC2
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker-volume/postgres/pg_data:/var/lib/postgresql/data
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    external: true
+    driver: bridge
