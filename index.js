@@ -4,7 +4,14 @@ const port = process.env.PORT || 5000;
 require("dotenv").config();
 
 const pgp = require("pg-promise")();
-const db = pgp(process.env.DATABASE_URL);
+const connectionDetails = {
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_DATABASE,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+};
+const db = pgp(connectionDetails);
 
 app.get("/", (req, res) => {
   db.any("SELECT * FROM attractions")
@@ -17,6 +24,9 @@ app.get("/", (req, res) => {
     });
 });
 
-app.listen(port, () => {
+app.listen(port, (err) => {
+  if (err) {
+    console.log(err);
+  }
   console.log(`Example app listening on port ${port}`);
 });
