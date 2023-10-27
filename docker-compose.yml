@@ -14,14 +14,18 @@ services:
       - mynetwork
   api:
     build: .
+    environment:
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: root
+      DB_DATABASE: testDockerEC2
+      #DB_SOURCE: postgres://postgres:root@db:5432/testDockerEC2
     ports:
       - "5000:5000"
     depends_on:
       - db
     networks:
       - mynetwork
-    environment:
-      DB_SOURCE: postgres://postgres:root@db:5432/testDockerEC2
 
 networks:
   mynetwork:
