@@ -31,22 +31,19 @@ const s3 = new S3Client({
   },
 });
 
-// generate image name
-const imageName = `${currentTime.getFullYear()}${
-  currentTime.getMonth() + 1
-}${currentTime.getDate()}_${currentTime.getHours()}${currentTime.getMinutes()}${currentTime.getSeconds()}_${timeStamp}`;
+const imageName_test = "kafka.jpg";
 
 // get all names
 router.get("/", async (req, res) => {
   db.any("SELECT * FROM attractions")
     .then((data) => {
-      console.log("data : ", data.length);
       res.json(data);
     })
     .catch((error) => {
       console.error("Error:", error);
       res.status(500).json({ error: "An error occurred" });
     });
+
   // const getObjectParams = {
   //   Bucket: bucketName,
   //   Key: "data.image",
@@ -54,6 +51,14 @@ router.get("/", async (req, res) => {
   // const command = new GetObjectCommand(getObjectParams);
   // const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
   // data.image = url;
+
+  // const params = {
+  //   Bucket: bucketName,
+  //   Key: imageName,
+  // };
+  // const command = new GetObjectCommand(params);
+  // const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+  // console.log("url : ", url);
 });
 
 // get one name by id
@@ -70,36 +75,44 @@ router.get("/:id", async (req, res) => {
 
 router.post("/api/upload", upload.single("image"), async (req, res) => {
   console.log("req.file : ", req.file);
-  // resize
+
+  // generate image name
+  const imageName = `${currentTime.getFullYear()}${
+    currentTime.getMonth() + 1
+  }${currentTime.getDate()}_${currentTime.getHours()}${currentTime.getMinutes()}${currentTime.getSeconds()}_${timeStamp}_${
+    req.file.originalname
+  }`;
+
+  // resize image
   const buffer = await sharp(req.file.buffer)
     .resize({ width: 1920, height: 1080, fit: "contain" })
     .toBuffer();
 
   // upload to s3
-  const params = {
+  const paramsPut = {
     Bucket: bucketName,
     Body: buffer,
     Key: imageName,
     ContentType: req.file.mimetype,
   };
-  const command = new PutObjectCommand(params);
-  const dataFromS3 = await s3.send(command);
+  const commandPut = new PutObjectCommand(paramsPut);
+  const dataFromS3 = await s3.send(commandPut);
   console.log("dataFromS3 : ", dataFromS3);
 
-  // add to database
+  // generate url
+  const paramsGet = {
+    Bucket: bucketName,
+    Key: imageName,
+  };
+  const commandGet = new GetObjectCommand(paramsGet);
+  const url = await getSignedUrl(s3, commandGet);
+  console.log("url : ", url);
+
+  // put data to postgresql
   db.any("INSERT INTO attractions (name, image) VALUES ($1, $2)", [
     req.body.name,
-    imageName,
+    url,
   ]);
-
-  // db.any("INSERT INTO attractions (name) VALUES ($1)", [req.body.name])
-  //   .then((data) => {
-  //     res.json(data);
-  //   })
-  //   .catch((error) => {
-  //     console.error("Error:", error);
-  //     res.status(500).json({ error: "An error occurred" });
-  //   });
 
   res.send("/api/upload : ok");
 });
