@@ -1,16 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+const bodyParser = require("body-parser");
 const app = express();
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 
+// routers
 const imageRouter = require("./routes/image");
-const attractionsRouter = require("./routes/attractions");
+const registerRouter = require("./routes/register-login");
 
 app.use(cors());
+app.use(express.json());
+app.use(bodyParser.json());
 
 app.use("/", imageRouter);
-app.use("/name", attractionsRouter);
+app.use("/api/auth", registerRouter);
 
 app.listen(port, (err) => {
   if (err) {

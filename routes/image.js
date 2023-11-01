@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 require("dotenv").config();
+const db = require("../database");
+
 const multer = require("multer");
 const {
   S3Client,
@@ -12,8 +14,6 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
-const db = require("../database");
 
 const currentTime = new Date();
 const timeStamp = new Date().getTime();
@@ -31,10 +31,8 @@ const s3 = new S3Client({
   },
 });
 
-const imageName_test = "kafka.jpg";
-
 // get all names
-router.get("/", async (req, res) => {
+router.get("/api/name", async (req, res) => {
   db.any("SELECT * FROM attractions")
     .then((data) => {
       res.json(data);
@@ -43,26 +41,10 @@ router.get("/", async (req, res) => {
       console.error("Error:", error);
       res.status(500).json({ error: "An error occurred" });
     });
-
-  // const getObjectParams = {
-  //   Bucket: bucketName,
-  //   Key: "data.image",
-  // };
-  // const command = new GetObjectCommand(getObjectParams);
-  // const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-  // data.image = url;
-
-  // const params = {
-  //   Bucket: bucketName,
-  //   Key: imageName,
-  // };
-  // const command = new GetObjectCommand(params);
-  // const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-  // console.log("url : ", url);
 });
 
 // get one name by id
-router.get("/:id", async (req, res) => {
+router.get("/api/name/:id", async (req, res) => {
   db.any("SELECT * FROM attractions where id = $1", req.params.id)
     .then((data) => {
       res.json(data);
@@ -74,8 +56,6 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/api/upload", upload.single("image"), async (req, res) => {
-  console.log("req.file : ", req.file);
-
   // generate image name
   const imageName = `${currentTime.getFullYear()}${
     currentTime.getMonth() + 1
@@ -85,7 +65,7 @@ router.post("/api/upload", upload.single("image"), async (req, res) => {
 
   // resize image
   const buffer = await sharp(req.file.buffer)
-    .resize({ width: 1920, height: 1080, fit: "contain" })
+    .resize({ width: 500, height: 500, fit: "contain" })
     .toBuffer();
 
   // upload to s3
@@ -96,17 +76,16 @@ router.post("/api/upload", upload.single("image"), async (req, res) => {
     ContentType: req.file.mimetype,
   };
   const commandPut = new PutObjectCommand(paramsPut);
-  const dataFromS3 = await s3.send(commandPut);
-  console.log("dataFromS3 : ", dataFromS3);
+  await s3.send(commandPut);
 
   // generate url
+  const expiration = 604800;
   const paramsGet = {
     Bucket: bucketName,
     Key: imageName,
   };
   const commandGet = new GetObjectCommand(paramsGet);
-  const url = await getSignedUrl(s3, commandGet);
-  console.log("url : ", url);
+  const url = await getSignedUrl(s3, commandGet, { expiresIn: expiration });
 
   // put data to postgresql
   db.any("INSERT INTO attractions (name, image) VALUES ($1, $2)", [
