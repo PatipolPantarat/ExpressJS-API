@@ -8,22 +8,30 @@ const jwt = require("jsonwebtoken");
 const secret = process.env.JWT_SECRET;
 
 router.get("/alluser", async (req, res) => {
-  const allUser = await db.any("SELECT * FROM users");
+  const allUser = await db.any("SELECT * FROM accounts");
   res.json(allUser);
 });
 
 router.post("/register", async (req, res) => {
-  const { username, password, role } = req.body;
-  const hadUser = await db.any("SELECT * FROM users WHERE username = $1", [
-    username,
-  ]);
+  const { username, email, password } = req.body;
+  const hadUser = await db.any(
+    "SELECT * FROM accounts WHERE username = $1 AND is_deleted = $2",
+    [username, false]
+  );
+  const hadEmail = await db.any(
+    "SELECT * FROM accounts WHERE email = $1 AND is_deleted = $2",
+    [email, false]
+  );
   if (hadUser.length > 0) {
     return res.json({ status: "error", message: "username already exists" });
   }
+  if (hadEmail.length > 0) {
+    return res.json({ status: "error", message: "email already exists" });
+  }
   bcrypt.hash(password, saltRounds, async (err, hash) => {
     await db.any(
-      "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
-      [username, hash, role]
+      "INSERT INTO accounts (username, email, password, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+      [username, email, hash, new Date(), new Date()]
     );
   });
   res.json({ status: "success", message: "register success" });
@@ -32,11 +40,18 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
   try {
-    const dataUser = await db.any("SELECT * FROM users WHERE username = $1", [
-      username,
-    ]);
+    const dataUser = await db.any(
+      "SELECT * FROM accounts WHERE username = $1 AND is_deleted = false",
+      [username]
+    );
     if (dataUser.length == 0) {
-      return res.json({ status: "error", message: "user not found" });
+      return res.json({ status: "user_not_found", message: "user not found" });
+    }
+    if (dataUser[0].account_type != "admin") {
+      return res.json({
+        status: "user_not_allow",
+        message: "this user not allow",
+      });
     }
     bcrypt.compare(password, dataUser[0].password, (err, isLogin) => {
       if (err) {
@@ -44,7 +59,10 @@ router.post("/login", async (req, res) => {
       }
       if (isLogin) {
         const token = jwt.sign(
-          { username: dataUser[0].username, role: dataUser[0].role },
+          {
+            username: dataUser[0].username,
+            account_type: dataUser[0].account_type,
+          },
           secret,
           {
             expiresIn: "1h",
@@ -56,7 +74,7 @@ router.post("/login", async (req, res) => {
           token,
         });
       } else {
-        res.json({ status: "error", message: "password incorrect" });
+        res.json({ status: "password_error", message: "password incorrect" });
       }
     });
   } catch (error) {
@@ -65,7 +83,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/authen", (req, res) => {
+router.post("/authenticate", (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, secret);
