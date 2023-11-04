@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
-app.use("/", imageRouter);
+// app.use("/", imageRouter);
 app.use("/api/auth", registerRouter);
 
 app.listen(port, (err) => {
