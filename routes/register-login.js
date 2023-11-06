@@ -102,11 +102,9 @@ router.post("/authenticate", async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
     const decoded = jwt.verify(token, secret);
-    console.log(decoded);
     const dataUser = await db.any("SELECT * FROM accounts WHERE email = $1", [
       decoded.email,
     ]);
-    console.log(dataUser);
     res.json({ status: "ok", message: dataUser[0] });
   } catch (error) {
     res.json({ status: "error", message: "token expired" });
