@@ -7,6 +7,10 @@ const saltRounds = 10;
 const jwt = require("jsonwebtoken");
 const secret = process.env.JWT_SECRET;
 
+const decodeJWT = (token) => {
+  return jwt.verify(token, secret);
+};
+
 router.get("/alluser", async (req, res) => {
   const allUser = await db.any(
     "SELECT * FROM accounts where is_deleted = false"
@@ -75,6 +79,7 @@ router.post("/login", async (req, res) => {
       if (isLogin) {
         const token = jwt.sign(
           {
+            id: dataUser[0].id,
             email: dataUser[0].email,
             account_type: dataUser[0].account_type,
           },
@@ -100,36 +105,38 @@ router.post("/login", async (req, res) => {
 
 router.post("/authenticate", async (req, res) => {
   try {
-    const token = req.headers.authorization.split(" ")[1];
-    const decoded = jwt.verify(token, secret);
+    const decoded = decodeJWT(req.headers.authorization.split(" ")[1]);
     const dataUser = await db.any("SELECT * FROM accounts WHERE email = $1", [
       decoded.email,
     ]);
-    res.json({ status: "ok", message: dataUser[0] });
+    res.json({ status: "ok", message: dataUser[0].username });
   } catch (error) {
     res.json({ status: "error", message: "token expired" });
   }
 });
 
 // Soft Delete
-router.post("/delete", async (req, res) => {
-  try {
-    const { selectedIDs } = req.body;
-    await db.any("UPDATE accounts SET is_deleted = true WHERE id = ANY($1)", [
-      selectedIDs,
-    ]);
-    res.status(200).json({ status: "success", message: "delete success" });
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: "An error occurred" });
-  }
-});
+// router.post("/delete", async (req, res) => {
+//   try {
+//     const { selectedIDs } = req.body;
+//     await db.any("UPDATE accounts SET is_deleted = true WHERE id = ANY($1)", [
+//       selectedIDs,
+//     ]);
+//     res.status(200).json({ status: "success", message: "delete success" });
+//   } catch (error) {
+//     console.error("Error:", error);
+//     res.status(500).json({ error: "An error occurred" });
+//   }
+// });
 
 // Hard Delete
 router.delete("/delete", async (req, res) => {
   try {
     const { selectedIDs } = req.body;
-    await db.any("DELETE FROM accounts WHERE id = ANY($1)", [selectedIDs]);
+    selectedIDs.forEach(async (id) => {
+      await db.any("DELETE FROM accounts WHERE id = $1", [id]);
+    });
+
     res
       .status(200)
       .json({ status: "success", message: "Data deleted successfully" });
