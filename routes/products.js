@@ -40,8 +40,7 @@ const decodeJWT = (token) => {
 router.get("/all", async (req, res) => {
   const urlPath = url.parse(req.url, true);
   const query = urlPath.query;
-  let result;
-  result = await db.any(
+  let result = await db.any(
     `select p.id as product_id , pc.name as category_name , pb.name as brand_name , p.name as product_name , p.price
     from products as p
     left join products_category as pc on p.category_id = pc.id
@@ -50,6 +49,25 @@ router.get("/all", async (req, res) => {
     [query.category_id, query.brand_id]
   );
   return res.json(result);
+});
+
+// get one product
+router.get("/product", async (req, res) => {
+  const urlPath = url.parse(req.url, true);
+  const query = urlPath.query;
+  console.log(query);
+  try {
+    let result = await db.any(
+      `select p.id , p.category_id , p.brand_id , p.name , p.title_image , p.price , p.detail
+    from products as p
+    where p.id = $1;`,
+      [query.product_id]
+    );
+    console.log(result);
+    res.json(result);
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 // lists category
@@ -99,7 +117,6 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
     Body: buffer,
     Key: imageName,
   };
-
   const commandPut = new PutObjectCommand(paramsPut);
   const result = await s3.send(commandPut);
   console.log(result);
@@ -134,6 +151,46 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
     ]
   );
   res.json({ status: "success" });
+});
+
+// update product
+router.put("/update_product", async (req, res) => {
+  console.log("/update_product", req.body);
+  // const { product_id, category, brand, name, price, detail } = req.body;
+  // try {
+  //   await db.any(
+  //     `update products set category_id = $1, brand_id = $2, name = $3, price = $4, detail = $5 where id = $6`,
+  //     [category, brand, name, price, detail, product_id]
+  //   );
+  //   res
+  //     .status(200)
+  //     .json({ status: "success", message: "Products updated successfully" });
+  // } catch (error) {
+  //   console.error("Error updating data:", error);
+  //   res.status(500).json({ error: "An error occurred" });
+  // }
+});
+
+// delete product
+router.delete("/delete", async (req, res) => {
+  console.log(req.body);
+  const { selectedIDs } = req.body;
+  try {
+    selectedIDs.forEach(async (id) => {
+      let result = await db.any(`select name from products where id = $1`, [
+        id,
+      ]);
+      console.log(result);
+      await db.any("DELETE FROM products WHERE id = $1", [id]);
+    });
+
+    res
+      .status(200)
+      .json({ status: "success", message: "Products deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting data:", error);
+    res.status(500).json({ error: "An error occurred" });
+  }
 });
 
 module.exports = router;
