@@ -3,11 +3,11 @@ const router = express.Router();
 require("dotenv").config();
 const db = require("../database");
 const multer = require("multer");
-const multerS3 = require("multer-s3");
 const {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const sharp = require("sharp");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -41,7 +41,8 @@ router.get("/all", async (req, res) => {
   const urlPath = url.parse(req.url, true);
   const query = urlPath.query;
   let result = await db.any(
-    `select p.id as product_id , pc.name as category_name , pb.name as brand_name , p.name as product_name , p.price
+    `select p.id as product_id , pc.name as category_name , pb.name as brand_name , p.name as product_name , 
+    p.price , p.title_image
     from products as p
     left join products_category as pc on p.category_id = pc.id
     left join products_brand as pb on p.brand_id = pb.id
@@ -55,11 +56,13 @@ router.get("/all", async (req, res) => {
 router.get("/product", async (req, res) => {
   const urlPath = url.parse(req.url, true);
   const query = urlPath.query;
-  console.log(query);
+  console.log("/product : ", query);
   try {
     let result = await db.any(
-      `select p.id , p.category_id , p.brand_id , p.name , p.title_image , p.price , p.detail
-    from products as p
+      `select p.id , pc.name as pc_name , pb.name as pb_name , p.name , p.title_image , p.price , p.detail
+      from products as p
+      left join products_category as pc on p.category_id = pc.id 
+      left join products_brand as pb on p.brand_id = pb.id
     where p.id = $1;`,
       [query.product_id]
     );
@@ -154,13 +157,14 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
 });
 
 // update product
-router.put("/update_product", async (req, res) => {
-  console.log("/update_product", req.body);
-  // const { product_id, category, brand, name, price, detail } = req.body;
+router.put("/update_product", (req, res) => {
+  console.log("/update_product : ", req.body);
+  res.json(req.body);
+  // const { product_id, category_id, brand_id, name, price, detail } = req.body;
   // try {
   //   await db.any(
   //     `update products set category_id = $1, brand_id = $2, name = $3, price = $4, detail = $5 where id = $6`,
-  //     [category, brand, name, price, detail, product_id]
+  //     [category_id, brand_id, name, price, detail, product_id]
   //   );
   //   res
   //     .status(200)
@@ -175,12 +179,28 @@ router.put("/update_product", async (req, res) => {
 router.delete("/delete", async (req, res) => {
   console.log(req.body);
   const { selectedIDs } = req.body;
+
   try {
     selectedIDs.forEach(async (id) => {
-      let result = await db.any(`select name from products where id = $1`, [
-        id,
-      ]);
-      console.log(result);
+      // Delete data in aws s3
+      const imageUrl = await db.any(
+        `select title_image from products where id = $1`,
+        [id]
+      );
+      const keyObject = await cutStringURL(imageUrl[0].title_image);
+      const params = {
+        Bucket: bucketName,
+        Key: keyObject,
+      };
+      const command = new DeleteObjectCommand(params);
+      const result = await s3.send(command);
+      console.log("result : ", result);
+      // const result = await db.any(`select name from products where id = $1`, [
+      //   id,
+      // ]);
+      // console.log(result);
+
+      // Delete data in postgresql
       await db.any("DELETE FROM products WHERE id = $1", [id]);
     });
 
@@ -192,5 +212,9 @@ router.delete("/delete", async (req, res) => {
     res.status(500).json({ error: "An error occurred" });
   }
 });
+
+async function cutStringURL(url) {
+  return url.replace(/\?.*/, "").split("/")[3];
+}
 
 module.exports = router;

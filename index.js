@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
+// const bodyParser = require("body-parser");
 const app = express();
 const port = process.env.PORT || 5000;
 require("dotenv").config();
@@ -11,7 +11,7 @@ const registerRouter = require("./routes/register-login");
 
 app.use(cors());
 app.use(express.json());
-app.use(bodyParser.json());
+// app.use(bodyParser.json());
 
 app.use("/api/products", productsRouter);
 app.use("/api/auth", registerRouter);
