@@ -59,7 +59,7 @@ router.get("/product", async (req, res) => {
   console.log("/product : ", query);
   try {
     let result = await db.any(
-      `select p.id , pc.name as pc_name , pb.name as pb_name , p.name , p.title_image , p.price , p.detail
+      `select p.id , pc.name as pc_name , pb.name as pb_name , p.name , p.title_image , p.price , p.detail , p.category_id , p.brand_id
       from products as p
       left join products_category as pc on p.category_id = pc.id 
       left join products_brand as pb on p.brand_id = pb.id
@@ -157,23 +157,58 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
 });
 
 // update product
-router.put("/update_product", (req, res) => {
-  console.log("/update_product : ", req.body);
-  res.json(req.body);
-  // const { product_id, category_id, brand_id, name, price, detail } = req.body;
-  // try {
-  //   await db.any(
-  //     `update products set category_id = $1, brand_id = $2, name = $3, price = $4, detail = $5 where id = $6`,
-  //     [category_id, brand_id, name, price, detail, product_id]
-  //   );
-  //   res
-  //     .status(200)
-  //     .json({ status: "success", message: "Products updated successfully" });
-  // } catch (error) {
-  //   console.error("Error updating data:", error);
-  //   res.status(500).json({ error: "An error occurred" });
-  // }
-});
+router.put(
+  "/update_product",
+  upload.single("form_edit_image"),
+  async (req, res) => {
+    console.log("/update_product body : ", req.body);
+    console.log("/update_product file : ", req.file);
+
+    // generate image name
+    const timeStamp = Date.now();
+    const imageName = `${timeStamp}_${req.file.originalname}`;
+
+    // resize image
+    const buffer = await sharp(req.file.buffer)
+      .resize({ width: 500, height: 500, fit: "contain" })
+      .toBuffer();
+
+    // upload to s3
+    const paramsPut = {
+      Bucket: bucketName,
+      Body: buffer,
+      Key: imageName,
+    };
+    const commandPut = new PutObjectCommand(paramsPut);
+    const result = await s3.send(commandPut);
+    console.log(result);
+
+    // generate url
+    const expiration = 604800;
+    const paramsGetUrl = {
+      Bucket: bucketName,
+      Key: imageName,
+    };
+    const commandGet = new GetObjectCommand(paramsGetUrl);
+    const imageUrl = await getSignedUrl(s3, commandGet, {
+      expiresIn: expiration,
+    });
+    const { product_id, category_id, brand_id, name, price, detail } = req.body;
+
+    try {
+      await db.any(
+        `update products set category_id = $1, brand_id = $2, name = $3, title_image = $4, price = $5, detail = $6 where id = $7`,
+        [category_id, brand_id, name, imageUrl, price, detail, product_id]
+      );
+      res
+        .status(200)
+        .json({ status: "success", message: "Products updated successfully" });
+    } catch (error) {
+      console.error("Error updating data:", error);
+      res.status(500).json({ error: "An error occurred" });
+    }
+  }
+);
 
 // delete product
 router.delete("/delete", async (req, res) => {
