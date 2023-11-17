@@ -165,41 +165,50 @@ router.put(
     console.log("/update_product file : ", req.file);
 
     // generate image name
-    const timeStamp = Date.now();
-    const imageName = `${timeStamp}_${req.file.originalname}`;
+    let imageName, imageUrl;
+    if (req.file) {
+      imageName = `${Date.now()}_${req.file.originalname}`;
+      // resize image
+      const buffer = await sharp(req.file.buffer)
+        .resize({ width: 500, height: 500, fit: "contain" })
+        .toBuffer();
 
-    // resize image
-    const buffer = await sharp(req.file.buffer)
-      .resize({ width: 500, height: 500, fit: "contain" })
-      .toBuffer();
+      // upload to s3
+      const paramsPut = {
+        Bucket: bucketName,
+        Body: buffer,
+        Key: imageName,
+      };
+      // const commandPut = new PutObjectCommand(paramsPut);
+      const result = await s3.send(new PutObjectCommand(paramsPut));
+      console.log(result);
 
-    // upload to s3
-    const paramsPut = {
-      Bucket: bucketName,
-      Body: buffer,
-      Key: imageName,
-    };
-    const commandPut = new PutObjectCommand(paramsPut);
-    const result = await s3.send(commandPut);
-    console.log(result);
+      // generate url
+      // const expiration = 604800;
+      const paramsGetUrl = {
+        Bucket: bucketName,
+        Key: imageName,
+      };
+      const commandGet = new GetObjectCommand(paramsGetUrl);
+      imageUrl = await getSignedUrl(s3, commandGet, {
+        expiresIn: 604800,
+      });
+    }
 
-    // generate url
-    const expiration = 604800;
-    const paramsGetUrl = {
-      Bucket: bucketName,
-      Key: imageName,
-    };
-    const commandGet = new GetObjectCommand(paramsGetUrl);
-    const imageUrl = await getSignedUrl(s3, commandGet, {
-      expiresIn: expiration,
-    });
     const { product_id, category_id, brand_id, name, price, detail } = req.body;
 
     try {
-      await db.any(
-        `update products set category_id = $1, brand_id = $2, name = $3, title_image = $4, price = $5, detail = $6 where id = $7`,
-        [category_id, brand_id, name, imageUrl, price, detail, product_id]
-      );
+      if (imageUrl) {
+        await db.any(
+          `update products set category_id = $1, brand_id = $2, name = $3, title_image = $4, price = $5, detail = $6 where id = $7`,
+          [category_id, brand_id, name, imageUrl, price, detail, product_id]
+        );
+      } else {
+        await db.any(
+          `update products set category_id = $1, brand_id = $2, name = $3, price = $4, detail = $5 where id = $6`,
+          [category_id, brand_id, name, price, detail, product_id]
+        );
+      }
       res
         .status(200)
         .json({ status: "success", message: "Products updated successfully" });
@@ -218,22 +227,18 @@ router.delete("/delete", async (req, res) => {
   try {
     selectedIDs.forEach(async (id) => {
       // Delete data in aws s3
-      const imageUrl = await db.any(
-        `select title_image from products where id = $1`,
-        [id]
-      );
-      const keyObject = await cutStringURL(imageUrl[0].title_image);
-      const params = {
-        Bucket: bucketName,
-        Key: keyObject,
-      };
-      const command = new DeleteObjectCommand(params);
-      const result = await s3.send(command);
-      console.log("result : ", result);
-      // const result = await db.any(`select name from products where id = $1`, [
-      //   id,
-      // ]);
-      // console.log(result);
+      // const imageUrl = await db.any(
+      //   `select title_image from products where id = $1`,
+      //   [id]
+      // );
+      // const keyObject = await cutStringURL(imageUrl[0].title_image);
+      // const params = {
+      //   Bucket: bucketName,
+      //   Key: keyObject,
+      // };
+      // const command = new DeleteObjectCommand(params);
+      // const result = await s3.send(command);
+      // console.log("result : ", result);
 
       // Delete data in postgresql
       await db.any("DELETE FROM products WHERE id = $1", [id]);

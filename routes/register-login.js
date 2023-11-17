@@ -58,30 +58,29 @@ router.post("/add_account", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
   try {
-    const dataUser = await db.any(
-      "SELECT * FROM accounts WHERE username = $1",
-      [username]
-    );
+    const hadUser = await db.any("SELECT * FROM accounts WHERE username = $1", [
+      username,
+    ]);
 
-    if (dataUser.length == 0 || dataUser[0].is_deleted == true) {
+    if (hadUser.length == 0 || hadUser[0].is_deleted == true) {
       return res.json({ status: "user_not_found", message: "user not found" });
     }
-    if (dataUser[0].account_type != "admin") {
+    if (hadUser[0].account_type != "admin") {
       return res.json({
         status: "user_not_allow",
         message: "this user not allow",
       });
     }
-    bcrypt.compare(password, dataUser[0].password, (err, isLogin) => {
+    bcrypt.compare(password, hadUser[0].password, (err, isLogin) => {
       if (err) {
         res.json({ status: "error", message: err });
       }
       if (isLogin) {
         const token = jwt.sign(
           {
-            id: dataUser[0].id,
-            email: dataUser[0].email,
-            account_type: dataUser[0].account_type,
+            id: hadUser[0].id,
+            email: hadUser[0].email,
+            account_type: hadUser[0].account_type,
           },
           secret,
           {
@@ -90,7 +89,7 @@ router.post("/login", async (req, res) => {
         );
         res.json({
           status: "success",
-          message: "login success",
+          message: "Login success",
           token,
         });
       } else {
