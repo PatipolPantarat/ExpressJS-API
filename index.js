@@ -26,6 +26,9 @@ const userLoginRouter = require("./routes/user-login");
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("API Connected");
+});
 app.use("/api/products", productsRouter);
 app.use("/api/auth", registerRouter);
 app.use("/api/user", userLoginRouter);
