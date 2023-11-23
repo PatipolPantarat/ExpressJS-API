@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_DB: testDockerEC2
     ports:
-      - "5433:5433"
+      - "5432:5432"
     volumes:
       - ./docker-volume/postgres/pg_data:/var/lib/postgresql/data
     networks:

@@ -41,12 +41,13 @@ router.get("/all", async (req, res) => {
   const urlPath = url.parse(req.url, true);
   const query = urlPath.query;
   let result = await db.any(
-    `select p.id as product_id , pc.name as category_name , pb.name as brand_name , p.name as product_name , 
+    `select p.id as product_id , pc.id as category_id , pc.name as category_name , pb.name as brand_name , p.name as product_name , 
     p.price , p.title_image
     from products as p
     left join products_category as pc on p.category_id = pc.id
     left join products_brand as pb on p.brand_id = pb.id
-        where (pc.id = $1 or $1 is null) and (pb.id = $2 or $2 is null)`,
+    where (pc.id = $1 or $1 is null) and (pb.id = $2 or $2 is null)
+    order by pb.name asc;`,
     [query.category_id, query.brand_id]
   );
   return res.json(result);
