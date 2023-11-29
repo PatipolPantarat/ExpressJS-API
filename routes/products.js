@@ -7,7 +7,6 @@ const {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
-  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 const sharp = require("sharp");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -123,7 +122,7 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
   };
   const commandPut = new PutObjectCommand(paramsPut);
   const result = await s3.send(commandPut);
-  console.log(result);
+  console.log("result s3 :", result);
 
   // generate url
   const expiration = 604800;
@@ -132,15 +131,17 @@ router.post("/add_products", upload.single("title_image"), async (req, res) => {
     Key: imageName,
   };
   const commandGet = new GetObjectCommand(paramsGetUrl);
-  const imageUrl = await getSignedUrl(s3, commandGet, {
-    expiresIn: expiration,
-  });
+  // const imageUrl = await getSignedUrl(s3, commandGet, {
+  //   expiresIn: expiration,
+  // });
+  console.log("commandGet : ", commandGet);
+  const imageUrl = `https://${bucketName}.s3.${bucketRegion}.amazonaws.com/${imageName}`;
 
   // insert data to postgresql
   const { category, brand, name, price, detail } = req.body;
   const detail_images = `{"detail_images": "url"}`;
   await db.any(
-    `insert into products (category_id, brand_id, name, title_image, detail_images, price, detail, create_at, update_at) 
+    `insert into products (category_id, brand_id, name, title_image, detail_images, price, detail, create_at, update_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       category,
